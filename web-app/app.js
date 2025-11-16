@@ -48,9 +48,15 @@ saveKeyBtn.addEventListener('click', () => {
     
     // Show saved message
     keySavedMsg.style.display = 'block';
+    
+    // Collapse the API config section after 1.5 seconds
     setTimeout(() => {
         keySavedMsg.style.display = 'none';
-    }, 3000);
+        const detailsElement = document.querySelector('.api-config details');
+        if (detailsElement) {
+            detailsElement.open = false;
+        }
+    }, 1500);
 });
 
 // Auto-save API key when typing (after a delay)
@@ -451,13 +457,18 @@ function exportToFile() {
         return;
     }
     
-    // Create text content
-    let content = 'Playlist Songs\n';
-    content += '='.repeat(50) + '\n\n';
-    
-    extractedSongs.forEach((song, index) => {
-        content += `${index + 1}. ${song.title}${song.artist ? ' - ' + song.artist : ''}\n`;
-    });
+    // Create clean content - one song per line, no special characters
+    // Format: "Title - Artist" for Spotify API compatibility
+    const content = extractedSongs
+        .map(song => {
+            // Clean special characters that might break Spotify API
+            const cleanTitle = song.title.replace(/[\n\r\t]/g, ' ').trim();
+            const cleanArtist = song.artist.replace(/[\n\r\t]/g, ' ').trim();
+            
+            // Return simple format: "Title - Artist"
+            return cleanArtist ? `${cleanTitle} - ${cleanArtist}` : cleanTitle;
+        })
+        .join('\n');
     
     // Create download
     const blob = new Blob([content], { type: 'text/plain' });

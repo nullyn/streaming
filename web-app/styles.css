@@ -255,6 +255,15 @@ main {
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     margin-bottom: 20px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.preview-section .btn {
+    display: block;
+    margin: 20px auto 0;
+    width: auto;
 }
 
 /* Progress Section */
