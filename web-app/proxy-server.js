@@ -124,13 +124,45 @@ async function handleDownloadPlaylist(payload, res) {
 
     try {
         const tempDir = await mkdtemp(path.join(tmpdir(), 'freyr-download-'));
-        const playlistPath = path.join(tempDir, 'playlist.txt');
+        const playlistPath = path.join(tempDir, 'my-playlist.txt');
+        const spotifyUrlsPath = path.join(tempDir, 'spotify-urls.txt');
         const downloadsDir = path.join(tempDir, 'downloads');
 
         // Create downloads directory
         await mkdir(downloadsDir, { recursive: true });
 
+        // Write the song titles
         await writeFile(playlistPath, playlistText, 'utf8');
+
+        // Check if we need to convert song titles to Spotify URLs
+        const firstLine = playlistText.split('\n')[0] || '';
+        const hasValidQuery = firstLine.match(/^(https?:\/\/|spotify:|apple_music:|deezer:)/);
+
+        let finalPlaylistPath = playlistPath;
+
+        if (!hasValidQuery) {
+            // Convert song titles to Spotify URLs using the existing Python script
+            console.log('[convert] Converting song titles to Spotify URLs...');
+            const converterScript = path.join(REPO_ROOT, 'convert_to_spotify_urls.py');
+
+            await new Promise((resolve, reject) => {
+                const converter = spawn('python3', [converterScript], {
+                    cwd: tempDir,
+                });
+
+                converter.stdout.on('data', d => console.log('[convert]', d.toString()));
+                converter.stderr.on('data', d => console.error('[convert]', d.toString()));
+
+                converter.on('error', reject);
+                converter.on('close', code => {
+                    if (code === 0) resolve();
+                    else reject(new Error(`Converter exited with code ${code}`));
+                });
+            });
+
+            // Use the converted Spotify URLs
+            finalPlaylistPath = spotifyUrlsPath;
+        }
 
         // Run Freyr CLI to download songs
         const cliPath = path.join(REPO_ROOT, 'cli.js');
@@ -141,7 +173,7 @@ async function handleDownloadPlaylist(payload, res) {
                 '--no-header',
                 '--no-bar',
                 '--directory', downloadsDir,
-                '-i', playlistPath,
+                '-i', finalPlaylistPath,
             ], {
                 cwd: REPO_ROOT,
             });
