@@ -192,8 +192,6 @@ async function handleDownloadPlaylist(payload, res) {
 }
 
 server.listen(PORT, () => {
-
-server.listen(PORT, () => {
     console.log(`✓ CORS Proxy server running on http://localhost:${PORT}`);
     console.log(`  Use this server to bypass CORS restrictions`);
     console.log(`  Press Ctrl+C to stop`);
