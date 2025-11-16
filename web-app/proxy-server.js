@@ -122,6 +122,18 @@ async function handleDownloadPlaylist(payload, res) {
         return;
     }
 
+    // Set up Server-Sent Events for progress streaming
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+    });
+
+    const sendProgress = (data) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
     try {
         const tempDir = await mkdtemp(path.join(tmpdir(), 'freyr-download-'));
         const playlistPath = path.join(tempDir, 'my-playlist.txt');
@@ -134,6 +146,11 @@ async function handleDownloadPlaylist(payload, res) {
         // Write the song titles
         await writeFile(playlistPath, playlistText, 'utf8');
 
+        const songLines = playlistText.trim().split('\n').filter(line => line.trim());
+        const totalSongs = songLines.length;
+
+        sendProgress({ stage: 'init', message: `Preparing to download ${totalSongs} songs...`, progress: 0 });
+
         // Check if we need to convert song titles to Spotify URLs
         const firstLine = playlistText.split('\n')[0] || '';
         const hasValidQuery = firstLine.match(/^(https?:\/\/|spotify:|apple_music:|deezer:)/);
@@ -141,8 +158,7 @@ async function handleDownloadPlaylist(payload, res) {
         let finalPlaylistPath = playlistPath;
 
         if (!hasValidQuery) {
-            // Convert song titles to Spotify URLs using the existing Python script
-            console.log('[convert] Converting song titles to Spotify URLs...');
+            sendProgress({ stage: 'convert', message: 'Converting song titles to Spotify URLs...', progress: 5 });
             const converterScript = path.join(REPO_ROOT, 'convert_to_spotify_urls.py');
 
             await new Promise((resolve, reject) => {
@@ -150,8 +166,16 @@ async function handleDownloadPlaylist(payload, res) {
                     cwd: tempDir,
                 });
 
-                converter.stdout.on('data', d => console.log('[convert]', d.toString()));
-                converter.stderr.on('data', d => console.error('[convert]', d.toString()));
+                converter.stdout.on('data', d => {
+                    const log = d.toString();
+                    console.log('[convert]', log);
+                    sendProgress({ stage: 'convert', log: log.trim() });
+                });
+                converter.stderr.on('data', d => {
+                    const log = d.toString();
+                    console.error('[convert]', log);
+                    sendProgress({ stage: 'convert', log: log.trim() });
+                });
 
                 converter.on('error', reject);
                 converter.on('close', code => {
@@ -160,26 +184,48 @@ async function handleDownloadPlaylist(payload, res) {
                 });
             });
 
-            // Use the converted Spotify URLs
             finalPlaylistPath = spotifyUrlsPath;
+            sendProgress({ stage: 'convert', message: 'URLs converted successfully', progress: 10 });
         }
 
         // Run Freyr CLI to download songs
+        sendProgress({ stage: 'download', message: 'Starting downloads...', progress: 15 });
         const cliPath = path.join(REPO_ROOT, 'cli.js');
+
+        let completedSongs = 0;
         await new Promise((resolve, reject) => {
             const child = spawn('node', [
                 cliPath,
                 '--no-logo',
                 '--no-header',
-                '--no-bar',
                 '--directory', downloadsDir,
                 '-i', finalPlaylistPath,
             ], {
                 cwd: REPO_ROOT,
             });
 
-            child.stdout.on('data', d => console.log('[freyr]', d.toString()));
-            child.stderr.on('data', d => console.error('[freyr]', d.toString()));
+            child.stdout.on('data', d => {
+                const log = d.toString();
+                console.log('[freyr]', log);
+                sendProgress({ stage: 'download', log: log.trim() });
+
+                // Track completed songs (freyr outputs "✓" or "completed" for each song)
+                if (log.includes('✓') || log.toLowerCase().includes('completed')) {
+                    completedSongs++;
+                    const downloadProgress = 15 + Math.floor((completedSongs / totalSongs) * 70);
+                    sendProgress({ 
+                        stage: 'download', 
+                        message: `Downloaded ${completedSongs}/${totalSongs} songs`, 
+                        progress: downloadProgress 
+                    });
+                }
+            });
+
+            child.stderr.on('data', d => {
+                const log = d.toString();
+                console.error('[freyr]', log);
+                sendProgress({ stage: 'download', log: log.trim() });
+            });
 
             child.on('error', reject);
             child.on('close', code => {
@@ -188,6 +234,8 @@ async function handleDownloadPlaylist(payload, res) {
             });
         });
 
+        sendProgress({ stage: 'zip', message: 'Zipping downloads...', progress: 90 });
+
         // Zip the downloads directory with no compression (-0)
         const zipPath = path.join(tempDir, 'playlist.zip');
         await new Promise((resolve, reject) => {
@@ -195,8 +243,16 @@ async function handleDownloadPlaylist(payload, res) {
                 cwd: tempDir,
             });
 
-            zip.stdout.on('data', d => console.log('[zip]', d.toString()));
-            zip.stderr.on('data', d => console.error('[zip]', d.toString()));
+            zip.stdout.on('data', d => {
+                const log = d.toString();
+                console.log('[zip]', log);
+                sendProgress({ stage: 'zip', log: log.trim() });
+            });
+            zip.stderr.on('data', d => {
+                const log = d.toString();
+                console.error('[zip]', log);
+                sendProgress({ stage: 'zip', log: log.trim() });
+            });
 
             zip.on('error', reject);
             zip.on('close', code => {
@@ -207,13 +263,15 @@ async function handleDownloadPlaylist(payload, res) {
 
         const zipData = await readFile(zipPath);
 
-        res.writeHead(200, {
-            'Content-Type': 'application/zip',
-            'Content-Disposition': 'attachment; filename="playlist.zip"',
-            'Content-Length': zipData.length,
-            'Access-Control-Allow-Origin': '*',
-        });
-        res.end(zipData);
+        sendProgress({ stage: 'complete', message: 'Download complete!', progress: 100, zipSize: zipData.length });
+
+        // Send the zip file as base64 in the final event
+        res.write(`data: ${JSON.stringify({ 
+            stage: 'download-ready', 
+            zipData: zipData.toString('base64'),
+            filename: 'playlist.zip'
+        })}\n\n`);
+        res.end();
 
         // Clean up temporary directory (best-effort)
         rm(tempDir, { recursive: true, force: true }).catch(err => {
@@ -221,8 +279,8 @@ async function handleDownloadPlaylist(payload, res) {
         });
     } catch (error) {
         console.error('Download error:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-        res.end(JSON.stringify({ error: error.message || 'Download failed' }));
+        sendProgress({ stage: 'error', message: error.message || 'Download failed' });
+        res.end();
     }
 }
 

@@ -89,8 +89,16 @@
                     <button id="resetBtn" class="btn btn-secondary">Start Over</button>
                 </div>
                 <div id="workingIndicator" class="working-indicator hidden">
-                    <div class="spinner"></div>
-                    <span>Working on your downloads...</span>
+                    <div class="download-progress">
+                        <div class="progress-bar-container">
+                            <div id="downloadProgressBar" class="download-progress-bar"></div>
+                        </div>
+                        <p id="downloadProgressMessage">Working on your downloads...</p>
+                    </div>
+                </div>
+                <div id="logViewer" class="log-viewer hidden">
+                    <div class="log-header">Download Logs</div>
+                    <div id="logContent" class="log-content"></div>
                 </div>
             </div>
         </main>

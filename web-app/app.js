@@ -496,48 +496,112 @@ function exportToFile() {
 
 async function downloadSongs() {
     if (!exportedPlaylistText) {
-        alert('Please export the playlist first');
+        alert('Please export the playlist first!');
         return;
     }
 
     downloadBtn.disabled = true;
     downloadBtn.textContent = 'Downloading...';
     workingIndicator.classList.remove('hidden');
+    
+    const logViewer = document.getElementById('logViewer');
+    const logContent = document.getElementById('logContent');
+    const progressBar = document.getElementById('downloadProgressBar');
+    const progressMessage = document.getElementById('downloadProgressMessage');
+    
+    logViewer.classList.remove('hidden');
+    logContent.innerHTML = '';
 
     try {
+        // Use Server-Sent Events for streaming progress
+        const eventSource = new EventSource('http://localhost:3000/download-playlist?' + 
+            new URLSearchParams({ playlistText: exportedPlaylistText }));
+        
+        // Actually we need to POST, so use fetch with streaming
         const response = await fetch('http://localhost:3000/download-playlist', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ playlistText: exportedPlaylistText }),
         });
 
-        if (!response.ok) {
-            let message = 'Download failed';
-            try {
-                const err = await response.json();
-                message = err.error || message;
-            } catch (_) {}
-            throw new Error(message);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Keep incomplete line in buffer
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        handleProgressUpdate(data, progressBar, progressMessage, logContent);
+                        
+                        // Handle download-ready event
+                        if (data.stage === 'download-ready') {
+                            // Convert base64 to blob and trigger download
+                            const binaryString = atob(data.zipData);
+                            const bytes = new Uint8Array(binaryString.length);
+                            for (let i = 0; i < binaryString.length; i++) {
+                                bytes[i] = binaryString.charCodeAt(i);
+                            }
+                            const blob = new Blob([bytes], { type: 'application/zip' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = data.filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            
+                            downloadBtn.textContent = 'Download Complete ✓';
+                            return;
+                        }
+                        
+                        if (data.stage === 'error') {
+                            throw new Error(data.message);
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse progress data:', e);
+                    }
+                }
+            }
         }
 
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'playlist.zip';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        downloadBtn.textContent = 'Download Complete';
     } catch (error) {
         console.error('Download error:', error);
         alert(`Failed to download songs: ${error.message}`);
         downloadBtn.disabled = false;
         downloadBtn.textContent = 'Download Songs';
-    } finally {
         workingIndicator.classList.add('hidden');
+        logViewer.classList.add('hidden');
+    }
+}
+
+function handleProgressUpdate(data, progressBar, progressMessage, logContent) {
+    // Update progress bar
+    if (data.progress !== undefined) {
+        progressBar.style.width = `${data.progress}%`;
+    }
+    
+    // Update message
+    if (data.message) {
+        progressMessage.textContent = data.message;
+    }
+    
+    // Add log entry
+    if (data.log) {
+        const logLine = document.createElement('div');
+        logLine.className = `log-line ${data.stage || ''}`;
+        logLine.textContent = data.log;
+        logContent.appendChild(logLine);
+        logContent.scrollTop = logContent.scrollHeight;
     }
 }
 
