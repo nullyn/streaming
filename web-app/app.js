@@ -1,6 +1,7 @@
 // DOM Elements
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
+const apiProviderSelect = document.getElementById('apiProvider');
 const apiKeyInput = document.getElementById('apiKey');
 const previewSection = document.getElementById('previewSection');
 const preview = document.getElementById('preview');
@@ -17,15 +18,165 @@ let uploadedImage = null;
 let uploadedImageBase64 = null;
 let extractedSongs = [];
 
-// Load API key from localStorage
-if (localStorage.getItem('openai_api_key')) {
-    apiKeyInput.value = localStorage.getItem('openai_api_key');
-}
+// Load saved provider and API key from localStorage
+const savedProvider = localStorage.getItem('ai_provider') || 'openai';
+apiProviderSelect.value = savedProvider;
+loadApiKeyForProvider(savedProvider);
+updateProviderUI(savedProvider);
+
+// Handle provider change
+apiProviderSelect.addEventListener('change', (e) => {
+    const provider = e.target.value;
+    localStorage.setItem('ai_provider', provider);
+    loadApiKeyForProvider(provider);
+    updateProviderUI(provider);
+});
 
 // Save API key to localStorage when changed
 apiKeyInput.addEventListener('input', () => {
-    localStorage.setItem('openai_api_key', apiKeyInput.value);
+    const provider = apiProviderSelect.value;
+    localStorage.setItem(`${provider}_api_key`, apiKeyInput.value);
 });
+
+function loadApiKeyForProvider(provider) {
+    const key = localStorage.getItem(`${provider}_api_key`) || '';
+    apiKeyInput.value = key;
+}
+
+function updateProviderUI(provider) {
+    // Show/hide provider links
+    document.querySelectorAll('.api-link').forEach(link => {
+        link.style.display = link.dataset.provider === provider ? 'inline-block' : 'none';
+    });
+    
+    // Show/hide provider info
+    document.querySelectorAll('.info-text').forEach(info => {
+        info.style.display = info.dataset.provider === provider ? 'block' : 'none';
+    });
+}
+
+// API Configuration for different providers
+const API_CONFIGS = {
+    openai: {
+        endpoint: 'https://api.openai.com/v1/chat/completions',
+        model: 'gpt-4o-mini',
+        buildRequest: (apiKey, base64Image) => ({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'This is a screenshot of a music playlist. Extract ALL song titles and artist names. Return ONLY a JSON array with this exact format: [{"title": "Song Name", "artist": "Artist Name"}]. Do not include any other text, explanations, or markdown formatting. Just the raw JSON array.'
+                        },
+                        {
+                            type: 'image_url',
+                            image_url: { url: base64Image }
+                        }
+                    ]
+                }],
+                max_tokens: 2000
+            })
+        }),
+        parseResponse: (data) => data.choices[0].message.content
+    },
+    claude: {
+        endpoint: 'https://api.anthropic.com/v1/messages',
+        model: 'claude-3-5-haiku-20241022',
+        buildRequest: (apiKey, base64Image) => ({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model: 'claude-3-5-haiku-20241022',
+                max_tokens: 2000,
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'image',
+                            source: {
+                                type: 'base64',
+                                media_type: base64Image.startsWith('data:image/png') ? 'image/png' : 'image/jpeg',
+                                data: base64Image.split(',')[1]
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: 'This is a screenshot of a music playlist. Extract ALL song titles and artist names. Return ONLY a JSON array with this exact format: [{"title": "Song Name", "artist": "Artist Name"}]. Do not include any other text, explanations, or markdown formatting. Just the raw JSON array.'
+                        }
+                    ]
+                }]
+            })
+        }),
+        parseResponse: (data) => data.content[0].text
+    },
+    glm: {
+        endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+        model: 'glm-4v-plus',
+        buildRequest: (apiKey, base64Image) => ({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'glm-4v-plus',
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'This is a screenshot of a music playlist. Extract ALL song titles and artist names. Return ONLY a JSON array with this exact format: [{"title": "Song Name", "artist": "Artist Name"}]. Do not include any other text, explanations, or markdown formatting. Just the raw JSON array.'
+                        },
+                        {
+                            type: 'image_url',
+                            image_url: { url: base64Image }
+                        }
+                    ]
+                }]
+            })
+        }),
+        parseResponse: (data) => data.choices[0].message.content
+    },
+    perplexity: {
+        endpoint: 'https://api.perplexity.ai/chat/completions',
+        model: 'llama-3.1-sonar-small-128k-online',
+        buildRequest: (apiKey, base64Image) => ({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'llama-3.1-sonar-small-128k-online',
+                messages: [{
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'This is a screenshot of a music playlist. Extract ALL song titles and artist names. Return ONLY a JSON array with this exact format: [{"title": "Song Name", "artist": "Artist Name"}]. Do not include any other text, explanations, or markdown formatting. Just the raw JSON array.'
+                        },
+                        {
+                            type: 'image_url',
+                            image_url: { url: base64Image }
+                        }
+                    ]
+                }]
+            })
+        }),
+        parseResponse: (data) => data.choices[0].message.content
+    }
+};
 
 // Initialize drag and drop
 function initDragAndDrop() {
@@ -94,61 +245,43 @@ function displayPreview(file) {
     reader.readAsDataURL(file);
 }
 
-// AI Vision Processing with OpenAI
+// AI Vision Processing with Multiple Providers
 async function processImage() {
     if (!uploadedImageBase64) return;
     
+    const provider = apiProviderSelect.value;
     const apiKey = apiKeyInput.value.trim();
+    
     if (!apiKey) {
-        alert('Please enter your OpenAI API key in the configuration section above.');
+        alert('Please enter your API key in the configuration section above.');
+        return;
+    }
+    
+    const config = API_CONFIGS[provider];
+    if (!config) {
+        alert('Invalid provider selected');
         return;
     }
     
     previewSection.classList.add('hidden');
     progressSection.classList.remove('hidden');
     progressBar.style.width = '30%';
-    progressText.textContent = 'Analyzing image with AI...';
+    progressText.textContent = `Analyzing image with ${provider.toUpperCase()}...`;
     
     try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o-mini',
-                messages: [
-                    {
-                        role: 'user',
-                        content: [
-                            {
-                                type: 'text',
-                                text: 'This is a screenshot of a music playlist. Extract ALL song titles and artist names. Return ONLY a JSON array with this exact format: [{"title": "Song Name", "artist": "Artist Name"}]. Do not include any other text, explanations, or markdown formatting. Just the raw JSON array.'
-                            },
-                            {
-                                type: 'image_url',
-                                image_url: {
-                                    url: uploadedImageBase64
-                                }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens: 2000
-            })
-        });
+        const requestConfig = config.buildRequest(apiKey, uploadedImageBase64);
+        const response = await fetch(config.endpoint, requestConfig);
         
         progressBar.style.width = '70%';
         progressText.textContent = 'Processing response...';
         
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error?.message || 'API request failed');
+            throw new Error(error.error?.message || error.message || 'API request failed');
         }
         
         const data = await response.json();
-        const content = data.choices[0].message.content.trim();
+        const content = config.parseResponse(data).trim();
         
         progressBar.style.width = '90%';
         progressText.textContent = 'Parsing songs...';

@@ -18,10 +18,32 @@
             <details>
                 <summary>⚙️ API Configuration (Required)</summary>
                 <div class="config-content">
-                    <label for="apiKey">OpenAI API Key:</label>
-                    <input type="password" id="apiKey" placeholder="sk-..." class="api-input">
-                    <p class="api-note">Your API key is stored locally and never sent anywhere except OpenAI.</p>
-                    <a href="https://platform.openai.com/api-keys" target="_blank" class="api-link">Get your API key here</a>
+                    <label for="apiProvider">AI Provider:</label>
+                    <select id="apiProvider" class="provider-select">
+                        <option value="openai">OpenAI (GPT-4o-mini)</option>
+                        <option value="claude">Anthropic Claude (Claude 3.5 Haiku)</option>
+                        <option value="glm">Zhipu GLM (GLM-4V-Plus)</option>
+                        <option value="perplexity">Perplexity (Llama 3.1 Sonar)</option>
+                    </select>
+                    
+                    <label for="apiKey" class="key-label">API Key:</label>
+                    <input type="password" id="apiKey" placeholder="Enter your API key" class="api-input">
+                    
+                    <p class="api-note">Your API key is stored locally and only sent to the selected provider.</p>
+                    
+                    <div class="provider-links">
+                        <a href="https://platform.openai.com/api-keys" target="_blank" class="api-link" data-provider="openai">Get OpenAI key</a>
+                        <a href="https://console.anthropic.com/settings/keys" target="_blank" class="api-link" data-provider="claude" style="display:none;">Get Claude key</a>
+                        <a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" class="api-link" data-provider="glm" style="display:none;">Get GLM key</a>
+                        <a href="https://www.perplexity.ai/settings/api" target="_blank" class="api-link" data-provider="perplexity" style="display:none;">Get Perplexity key</a>
+                    </div>
+                    
+                    <div class="provider-info">
+                        <p class="info-text" data-provider="openai">💵 Cost: ~$0.01-0.02/image | 🎯 Best overall accuracy</p>
+                        <p class="info-text" data-provider="claude" style="display:none;">💵 Cost: ~$0.008/image | 🎯 Excellent vision understanding</p>
+                        <p class="info-text" data-provider="glm" style="display:none;">💵 Cost: ~$0.005/image | 🇨🇳 Chinese language support</p>
+                        <p class="info-text" data-provider="perplexity" style="display:none;">💵 Cost: ~$0.005/image | ⚡ Fast processing</p>
+                    </div>
                 </div>
             </details>
         </div>

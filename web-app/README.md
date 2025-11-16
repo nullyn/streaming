@@ -5,7 +5,8 @@ A web application that extracts song information from playlist screenshots using
 ## Features
 
 - **Drag & Drop Interface** - Simply drag a playlist screenshot onto the page
-- **AI Vision Processing** - Uses OpenAI's GPT-4o-mini for accurate text extraction
+- **Multiple AI Providers** - Choose from OpenAI, Claude, GLM, or Perplexity
+- **AI Vision Processing** - Accurate text extraction with context understanding
 - **Smart Recognition** - AI understands playlist layouts and extracts structured data
 - **Interactive Editing** - Review, edit, and confirm each song
 - **Remove Songs** - Click the X button to remove unwanted entries
@@ -13,14 +14,16 @@ A web application that extracts song information from playlist screenshots using
 
 ## How to Use
 
-1. **Get an OpenAI API Key**
-   - Visit [OpenAI API Keys](https://platform.openai.com/api-keys)
-   - Create a new API key (costs ~$0.01-0.02 per image)
-   - Copy the key
+1. **Get an API Key** (choose one provider)
+   - **OpenAI**: [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (~$0.01-0.02/image)
+   - **Claude**: [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (~$0.008/image)
+   - **GLM**: [open.bigmodel.cn/usercenter/apikeys](https://open.bigmodel.cn/usercenter/apikeys) (~$0.005/image)
+   - **Perplexity**: [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api) (~$0.005/image)
 
 2. **Configure the App**
    - Open `index.html` in a web browser
    - Click the "⚙️ API Configuration" section
+   - Select your preferred AI provider
    - Paste your API key (it's stored locally in your browser)
 
 3. **Upload a screenshot** of your playlist by:
@@ -56,14 +59,20 @@ A web application that extracts song information from playlist screenshots using
 - **HTML5** - Structure
 - **CSS3** - Styling with modern gradients and animations
 - **JavaScript (ES6+)** - Application logic
-- **OpenAI GPT-4o-mini** - AI vision model for image analysis
+- **AI Vision Models** - Multiple provider support
 
-## Cost
+## Supported AI Providers
 
-- Uses OpenAI's GPT-4o-mini model
-- Cost: ~$0.01-0.02 per screenshot
+| Provider | Model | Cost/Image | Best For |
+|----------|-------|------------|----------|
+| **OpenAI** | GPT-4o-mini | ~$0.01-0.02 | Best overall accuracy |
+| **Claude** | Claude 3.5 Haiku | ~$0.008 | Excellent vision understanding |
+| **GLM** | GLM-4V-Plus | ~$0.005 | Chinese language support |
+| **Perplexity** | Llama 3.1 Sonar | ~$0.005 | Fast processing |
+
+- API keys stored locally in your browser
 - Much more accurate than traditional OCR
-- API key stored locally in your browser
+- Choose the provider that best fits your needs and budget
 
 ## Local Development
 
