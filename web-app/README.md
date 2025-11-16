@@ -1,27 +1,40 @@
 # Playlist Screenshot Reader
 
-A web application that extracts song information from playlist screenshots using OCR (Optical Character Recognition).
+A web application that extracts song information from playlist screenshots using AI vision models.
 
 ## Features
 
 - **Drag & Drop Interface** - Simply drag a playlist screenshot onto the page
-- **OCR Processing** - Uses Tesseract.js to extract text from images
-- **Smart Parsing** - Automatically detects song titles and artist names
+- **AI Vision Processing** - Uses OpenAI's GPT-4o-mini for accurate text extraction
+- **Smart Recognition** - AI understands playlist layouts and extracts structured data
 - **Interactive Editing** - Review, edit, and confirm each song
 - **Remove Songs** - Click the X button to remove unwanted entries
 - **Export to File** - Save your playlist as a text file
 
 ## How to Use
 
-1. **Open `index.html`** in a web browser
-2. **Upload a screenshot** of your playlist by:
+1. **Get an OpenAI API Key**
+   - Visit [OpenAI API Keys](https://platform.openai.com/api-keys)
+   - Create a new API key (costs ~$0.01-0.02 per image)
+   - Copy the key
+
+2. **Configure the App**
+   - Open `index.html` in a web browser
+   - Click the "⚙️ API Configuration" section
+   - Paste your API key (it's stored locally in your browser)
+
+3. **Upload a screenshot** of your playlist by:
    - Dragging and dropping it onto the upload area
    - Or clicking the upload area to browse for a file
-3. **Preview** the screenshot and click "Extract Songs"
-4. **Wait** for the OCR processing (progress bar will show status)
+
+4. **Extract Songs**
+   - Preview the screenshot and click "Extract Songs"
+   - Wait for AI processing (progress bar will show status)
+
 5. **Review and Edit** the extracted songs:
    - Edit song titles and artist names directly in the text fields
    - Click the red X button to remove any incorrect entries
+
 6. **Export** your playlist to a text file
 
 ## Supported Screenshot Formats
@@ -43,7 +56,14 @@ A web application that extracts song information from playlist screenshots using
 - **HTML5** - Structure
 - **CSS3** - Styling with modern gradients and animations
 - **JavaScript (ES6+)** - Application logic
-- **Tesseract.js** - OCR engine for text extraction
+- **OpenAI GPT-4o-mini** - AI vision model for image analysis
+
+## Cost
+
+- Uses OpenAI's GPT-4o-mini model
+- Cost: ~$0.01-0.02 per screenshot
+- Much more accurate than traditional OCR
+- API key stored locally in your browser
 
 ## Local Development
 

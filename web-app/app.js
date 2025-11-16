@@ -1,6 +1,7 @@
 // DOM Elements
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
+const apiKeyInput = document.getElementById('apiKey');
 const previewSection = document.getElementById('previewSection');
 const preview = document.getElementById('preview');
 const processBtn = document.getElementById('processBtn');
@@ -13,7 +14,18 @@ const exportBtn = document.getElementById('exportBtn');
 const resetBtn = document.getElementById('resetBtn');
 
 let uploadedImage = null;
+let uploadedImageBase64 = null;
 let extractedSongs = [];
+
+// Load API key from localStorage
+if (localStorage.getItem('openai_api_key')) {
+    apiKeyInput.value = localStorage.getItem('openai_api_key');
+}
+
+// Save API key to localStorage when changed
+apiKeyInput.addEventListener('input', () => {
+    localStorage.setItem('openai_api_key', apiKeyInput.value);
+});
 
 // Initialize drag and drop
 function initDragAndDrop() {
@@ -74,119 +86,105 @@ function handleFiles(files) {
 function displayPreview(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
-        preview.src = e.target.result;
+        uploadedImageBase64 = e.target.result;
+        preview.src = uploadedImageBase64;
         dropZone.classList.add('hidden');
         previewSection.classList.remove('hidden');
     };
     reader.readAsDataURL(file);
 }
 
-// OCR Processing
+// AI Vision Processing with OpenAI
 async function processImage() {
-    if (!uploadedImage) return;
+    if (!uploadedImageBase64) return;
+    
+    const apiKey = apiKeyInput.value.trim();
+    if (!apiKey) {
+        alert('Please enter your OpenAI API key in the configuration section above.');
+        return;
+    }
     
     previewSection.classList.add('hidden');
     progressSection.classList.remove('hidden');
-    progressBar.style.width = '0%';
-    progressText.textContent = 'Initializing OCR...';
+    progressBar.style.width = '30%';
+    progressText.textContent = 'Analyzing image with AI...';
     
     try {
-        const { data: { text } } = await Tesseract.recognize(
-            uploadedImage,
-            'eng',
-            {
-                logger: (m) => {
-                    if (m.status === 'recognizing text') {
-                        const progress = Math.round(m.progress * 100);
-                        progressBar.style.width = `${progress}%`;
-                        progressText.textContent = `Extracting text... ${progress}%`;
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'text',
+                                text: 'This is a screenshot of a music playlist. Extract ALL song titles and artist names. Return ONLY a JSON array with this exact format: [{"title": "Song Name", "artist": "Artist Name"}]. Do not include any other text, explanations, or markdown formatting. Just the raw JSON array.'
+                            },
+                            {
+                                type: 'image_url',
+                                image_url: {
+                                    url: uploadedImageBase64
+                                }
+                            }
+                        ]
                     }
-                }
-            }
-        );
+                ],
+                max_tokens: 2000
+            })
+        });
         
+        progressBar.style.width = '70%';
+        progressText.textContent = 'Processing response...';
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error?.message || 'API request failed');
+        }
+        
+        const data = await response.json();
+        const content = data.choices[0].message.content.trim();
+        
+        progressBar.style.width = '90%';
         progressText.textContent = 'Parsing songs...';
-        extractedSongs = parseSongsFromText(text);
         
-        if (extractedSongs.length === 0) {
+        // Parse the JSON response
+        let songs;
+        try {
+            // Remove markdown code blocks if present
+            const cleanContent = content.replace(/```json\n?|```\n?/g, '').trim();
+            songs = JSON.parse(cleanContent);
+        } catch (e) {
+            console.error('Failed to parse JSON:', content);
+            throw new Error('Failed to parse AI response. Please try again.');
+        }
+        
+        if (!Array.isArray(songs) || songs.length === 0) {
             alert('No songs found in the image. Please try a clearer screenshot.');
             reset();
             return;
         }
         
-        progressSection.classList.add('hidden');
-        displaySongConfirmation();
+        extractedSongs = songs;
+        progressBar.style.width = '100%';
+        
+        setTimeout(() => {
+            progressSection.classList.add('hidden');
+            displaySongConfirmation();
+        }, 300);
         
     } catch (error) {
-        console.error('OCR Error:', error);
-        alert('Failed to process image. Please try again.');
+        console.error('AI Processing Error:', error);
+        alert(`Failed to process image: ${error.message}`);
         reset();
     }
 }
 
-// Parse songs from OCR text
-function parseSongsFromText(text) {
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    const songs = [];
-    
-    // Try to detect song patterns
-    // Common patterns: "Title - Artist", "Title by Artist", "Artist: Title"
-    let currentSong = null;
-    
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        
-        // Skip common playlist UI elements
-        if (line.match(/^(play|pause|shuffle|repeat|like|download|share|add|playlist|duration)/i)) {
-            continue;
-        }
-        
-        // Try to match "Title - Artist" or "Title by Artist"
-        const dashMatch = line.match(/^(.+?)\s*[-–—]\s*(.+)$/);
-        const byMatch = line.match(/^(.+?)\s+by\s+(.+)$/i);
-        const colonMatch = line.match(/^(.+?):\s*(.+)$/);
-        
-        if (dashMatch) {
-            songs.push({
-                title: dashMatch[1].trim(),
-                artist: dashMatch[2].trim()
-            });
-        } else if (byMatch) {
-            songs.push({
-                title: byMatch[1].trim(),
-                artist: byMatch[2].trim()
-            });
-        } else if (colonMatch && colonMatch[2].length > 3) {
-            songs.push({
-                title: colonMatch[2].trim(),
-                artist: colonMatch[1].trim()
-            });
-        } else if (line.length > 3 && !line.match(/^\d+$/)) {
-            // If we have a potential song title without artist
-            if (currentSong === null) {
-                currentSong = { title: line, artist: '' };
-            } else if (currentSong.artist === '') {
-                // Next line might be the artist
-                currentSong.artist = line;
-                songs.push(currentSong);
-                currentSong = null;
-            } else {
-                // Start a new song
-                if (currentSong.title) {
-                    songs.push(currentSong);
-                }
-                currentSong = { title: line, artist: '' };
-            }
-        }
-    }
-    
-    // Add the last song if exists
-    if (currentSong && currentSong.title) {
-        songs.push(currentSong);
-    }
-    
-    return songs;
-}
 
 // Display song confirmation UI
 function displaySongConfirmation() {

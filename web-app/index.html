@@ -13,6 +13,19 @@
             <p>Upload a screenshot of your playlist to extract songs</p>
         </header>
 
+        <!-- API Key Configuration -->
+        <div class="api-config">
+            <details>
+                <summary>⚙️ API Configuration (Required)</summary>
+                <div class="config-content">
+                    <label for="apiKey">OpenAI API Key:</label>
+                    <input type="password" id="apiKey" placeholder="sk-..." class="api-input">
+                    <p class="api-note">Your API key is stored locally and never sent anywhere except OpenAI.</p>
+                    <a href="https://platform.openai.com/api-keys" target="_blank" class="api-link">Get your API key here</a>
+                </div>
+            </details>
+        </div>
+
         <main>
             <!-- Drag and Drop Zone -->
             <div id="dropZone" class="drop-zone">
@@ -54,8 +67,6 @@
         </main>
     </div>
 
-    <!-- Use Tesseract.js from CDN for OCR -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.0/dist/tesseract.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
