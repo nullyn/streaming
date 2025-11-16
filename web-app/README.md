@@ -5,7 +5,7 @@ A web application that extracts song information from playlist screenshots using
 ## Features
 
 - **Drag & Drop Interface** - Simply drag a playlist screenshot onto the page
-- **Multiple AI Providers** - Choose from OpenAI, Claude, GLM, or Perplexity
+- **Multiple AI Providers** - Choose from OpenAI, Claude, or GLM
 - **AI Vision Processing** - Accurate text extraction with context understanding
 - **Smart Recognition** - AI understands playlist layouts and extracts structured data
 - **Interactive Editing** - Review, edit, and confirm each song
@@ -18,7 +18,6 @@ A web application that extracts song information from playlist screenshots using
    - **OpenAI**: [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (~$0.01-0.02/image)
    - **Claude**: [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (~$0.008/image)
    - **GLM**: [open.bigmodel.cn/usercenter/apikeys](https://open.bigmodel.cn/usercenter/apikeys) (~$0.005/image)
-   - **Perplexity**: [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api) (~$0.005/image)
 
 2. **Configure the App**
    - Open `index.html` in a web browser
@@ -68,7 +67,6 @@ A web application that extracts song information from playlist screenshots using
 | **OpenAI** | GPT-4o-mini | ~$0.01-0.02 | Best overall accuracy |
 | **Claude** | Claude 3.5 Haiku | ~$0.008 | Excellent vision understanding |
 | **GLM** | GLM-4V-Plus | ~$0.005 | Chinese language support |
-| **Perplexity** | Llama 3.1 Sonar | ~$0.005 | Fast processing |
 
 - API keys stored locally in your browser
 - Much more accurate than traditional OCR

@@ -148,34 +148,6 @@ const API_CONFIGS = {
         }),
         parseResponse: (data) => data.choices[0].message.content
     },
-    perplexity: {
-        endpoint: 'https://api.perplexity.ai/chat/completions',
-        model: 'llama-3.1-sonar-small-128k-online',
-        buildRequest: (apiKey, base64Image) => ({
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'llama-3.1-sonar-small-128k-online',
-                messages: [{
-                    role: 'user',
-                    content: [
-                        {
-                            type: 'text',
-                            text: 'This is a screenshot of a music playlist. Extract ALL song titles and artist names. Return ONLY a JSON array with this exact format: [{"title": "Song Name", "artist": "Artist Name"}]. Do not include any other text, explanations, or markdown formatting. Just the raw JSON array.'
-                        },
-                        {
-                            type: 'image_url',
-                            image_url: { url: base64Image }
-                        }
-                    ]
-                }]
-            })
-        }),
-        parseResponse: (data) => data.choices[0].message.content
-    }
 };
 
 // Initialize drag and drop
