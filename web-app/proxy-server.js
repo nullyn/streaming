@@ -10,7 +10,7 @@ import { URL, fileURLToPath } from 'url';
 import path from 'path';
 import { tmpdir } from 'os';
 import { spawn } from 'child_process';
-import { mkdtemp, writeFile, readFile, rm } from 'fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'fs/promises';
 
 const PORT = 3000;
 
@@ -126,6 +126,9 @@ async function handleDownloadPlaylist(payload, res) {
         const tempDir = await mkdtemp(path.join(tmpdir(), 'freyr-download-'));
         const playlistPath = path.join(tempDir, 'playlist.txt');
         const downloadsDir = path.join(tempDir, 'downloads');
+
+        // Create downloads directory
+        await mkdir(downloadsDir, { recursive: true });
 
         await writeFile(playlistPath, playlistText, 'utf8');
 
