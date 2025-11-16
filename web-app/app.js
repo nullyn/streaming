@@ -14,11 +14,14 @@ const progressText = document.getElementById('progressText');
 const confirmationSection = document.getElementById('confirmationSection');
 const songList = document.getElementById('songList');
 const exportBtn = document.getElementById('exportBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const workingIndicator = document.getElementById('workingIndicator');
 const resetBtn = document.getElementById('resetBtn');
 
 let uploadedImage = null;
 let uploadedImageBase64 = null;
 let extractedSongs = [];
+let exportedPlaylistText = '';
 
 // Load saved provider and API key from localStorage
 const savedProvider = localStorage.getItem('ai_provider') || 'openai';
@@ -470,7 +473,10 @@ function exportToFile() {
         })
         .join('\n');
     
-    // Create download
+    // Save for server-side download
+    exportedPlaylistText = content;
+    
+    // Create download of playlist file
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -480,12 +486,66 @@ function exportToFile() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    // Swap buttons: hide export, show download
+    exportBtn.classList.add('hidden');
+    downloadBtn.classList.remove('hidden');
+    downloadBtn.disabled = false;
+    downloadBtn.textContent = 'Download Songs';
+}
+
+async function downloadSongs() {
+    if (!exportedPlaylistText) {
+        alert('Please export the playlist first');
+        return;
+    }
+
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = 'Downloading...';
+    workingIndicator.classList.remove('hidden');
+
+    try {
+        const response = await fetch('http://localhost:3000/download-playlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ playlistText: exportedPlaylistText }),
+        });
+
+        if (!response.ok) {
+            let message = 'Download failed';
+            try {
+                const err = await response.json();
+                message = err.error || message;
+            } catch (_) {}
+            throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'playlist.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        downloadBtn.textContent = 'Download Complete';
+    } catch (error) {
+        console.error('Download error:', error);
+        alert(`Failed to download songs: ${error.message}`);
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = 'Download Songs';
+    } finally {
+        workingIndicator.classList.add('hidden');
+    }
 }
 
 // Reset everything
 function reset() {
     uploadedImage = null;
     extractedSongs = [];
+    exportedPlaylistText = '';
     fileInput.value = '';
     preview.src = '';
     
@@ -493,6 +553,11 @@ function reset() {
     progressSection.classList.add('hidden');
     confirmationSection.classList.add('hidden');
     dropZone.classList.remove('hidden');
+    workingIndicator.classList.add('hidden');
+    downloadBtn.classList.add('hidden');
+    exportBtn.classList.remove('hidden');
+    exportBtn.disabled = false;
+    exportBtn.textContent = 'Export to Playlist';
     
     songList.innerHTML = '';
 }
@@ -500,6 +565,7 @@ function reset() {
 // Event listeners
 processBtn.addEventListener('click', processImage);
 exportBtn.addEventListener('click', exportToFile);
+downloadBtn.addEventListener('click', downloadSongs);
 resetBtn.addEventListener('click', reset);
 
 // Initialize on load
