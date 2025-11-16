@@ -8,3 +8,7 @@ bins/
 stage/
 
 .DS_Store
+
+# local playlists (PII)
+my-playlist.txt
+spotify-urls.txt
