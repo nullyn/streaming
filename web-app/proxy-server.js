@@ -198,6 +198,7 @@ async function handleDownloadPlaylist(payload, res) {
                 cliPath,
                 '--no-logo',
                 '--no-header',
+                '--format', 'mp3',
                 '--directory', downloadsDir,
                 '-i', finalPlaylistPath,
             ], {
