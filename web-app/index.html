@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playlist Screenshot Reader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Playlist Screenshot Reader</h1>
+            <p>Upload a screenshot of your playlist to extract songs</p>
+        </header>
+
+        <main>
+            <!-- Drag and Drop Zone -->
+            <div id="dropZone" class="drop-zone">
+                <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p class="drop-text">Drag & drop a playlist screenshot here</p>
+                <p class="drop-text-secondary">or click to browse</p>
+                <input type="file" id="fileInput" accept="image/*" hidden>
+            </div>
+
+            <!-- Preview Section -->
+            <div id="previewSection" class="preview-section hidden">
+                <h2>Screenshot Preview</h2>
+                <img id="preview" class="preview-image" alt="Screenshot preview">
+                <button id="processBtn" class="btn btn-primary">Extract Songs</button>
+            </div>
+
+            <!-- Progress Section -->
+            <div id="progressSection" class="progress-section hidden">
+                <div class="progress-bar">
+                    <div id="progressBar" class="progress-fill"></div>
+                </div>
+                <p id="progressText" class="progress-text">Processing image...</p>
+            </div>
+
+            <!-- Confirmation Section -->
+            <div id="confirmationSection" class="confirmation-section hidden">
+                <div class="confirmation-header">
+                    <h2>Confirm Songs</h2>
+                    <p>Review and edit the extracted songs. Click the X to remove a song.</p>
+                </div>
+                <div id="songList" class="song-list"></div>
+                <div class="action-buttons">
+                    <button id="exportBtn" class="btn btn-success">Export to File</button>
+                    <button id="resetBtn" class="btn btn-secondary">Start Over</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Use Tesseract.js from CDN for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.0/dist/tesseract.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
