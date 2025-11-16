@@ -40,6 +40,122 @@ async function collectAudioFiles(rootDir, exts) {
     return results;
 }
 
+async function cleanupOnStartup() {
+    console.log('🧹 Cleaning up old files from previous sessions...');
+
+    const cleanupTasks = [];
+
+    // 1. Clean up temp directories (freyr-download-* folders)
+    try {
+        const tempDir = tmpdir();
+        const entries = await readdir(tempDir, { withFileTypes: true });
+
+        for (const entry of entries) {
+            if (entry.isDirectory() && entry.name.startsWith('freyr-download-')) {
+                const fullPath = path.join(tempDir, entry.name);
+                cleanupTasks.push(
+                    rm(fullPath, { recursive: true, force: true })
+                        .then(() => console.log(`  ✓ Removed temp dir: ${entry.name}`))
+                        .catch(err => console.error(`  ✗ Failed to remove ${entry.name}:`, err.message))
+                );
+            }
+        }
+    } catch (err) {
+        console.error('  ✗ Failed to scan temp directory:', err.message);
+    }
+
+    // 2. Clean up Freyr cache directory
+    try {
+        // Freyr cache is typically in system cache dir or <cache> placeholder
+        // Default location on macOS: ~/Library/Caches/FreyrCLI
+        const homeDir = process.env.HOME || process.env.USERPROFILE;
+        const cacheLocations = [
+            path.join(homeDir, 'Library', 'Caches', 'FreyrCLI'),
+            path.join(homeDir, '.cache', 'FreyrCLI'),
+            path.join(REPO_ROOT, '.cache'),
+        ];
+
+        for (const cachePath of cacheLocations) {
+            try {
+                await rm(cachePath, { recursive: true, force: true });
+                console.log(`  ✓ Cleared Freyr cache: ${cachePath}`);
+            } catch (err) {
+                // Ignore if directory doesn't exist
+                if (err.code !== 'ENOENT') {
+                    console.error(`  ✗ Failed to clear cache ${cachePath}:`, err.message);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('  ✗ Cache cleanup error:', err.message);
+    }
+
+    // 3. Clean up any leftover downloads in repo root
+    try {
+        const repoEntries = await readdir(REPO_ROOT, { withFileTypes: true });
+
+        for (const entry of repoEntries) {
+            // Remove artist/album folders (directories with audio files)
+            if (entry.isDirectory() && 
+                !['node_modules', '.git', 'src', 'test', 'media', 'web-app', 'docs'].includes(entry.name)) {
+                const fullPath = path.join(REPO_ROOT, entry.name);
+
+                // Check if it contains audio files
+                try {
+                    const audioFiles = await collectAudioFiles(fullPath, ['.m4a', '.mp3']);
+                    if (audioFiles.length > 0) {
+                        cleanupTasks.push(
+                            rm(fullPath, { recursive: true, force: true })
+                                .then(() => console.log(`  ✓ Removed download folder: ${entry.name}`))
+                                .catch(err => console.error(`  ✗ Failed to remove ${entry.name}:`, err.message))
+                        );
+                    }
+                } catch (err) {
+                    // Skip if can't read directory
+                }
+            }
+
+            // Remove standalone audio files in root
+            if (!entry.isDirectory()) {
+                const lower = entry.name.toLowerCase();
+                if (['.m4a', '.mp3', '.flac'].some(ext => lower.endsWith(ext))) {
+                    const fullPath = path.join(REPO_ROOT, entry.name);
+                    cleanupTasks.push(
+                        rm(fullPath, { force: true })
+                            .then(() => console.log(`  ✓ Removed audio file: ${entry.name}`))
+                            .catch(err => console.error(`  ✗ Failed to remove ${entry.name}:`, err.message))
+                    );
+                }
+            }
+        }
+    } catch (err) {
+        console.error('  ✗ Failed to scan repo directory:', err.message);
+    }
+
+    // 4. Clean up any *.txt files from converter script
+    try {
+        const txtFilesToRemove = ['my-playlist.txt', 'spotify-urls.txt'];
+        for (const fileName of txtFilesToRemove) {
+            const filePath = path.join(REPO_ROOT, fileName);
+            cleanupTasks.push(
+                rm(filePath, { force: true })
+                    .then(() => console.log(`  ✓ Removed: ${fileName}`))
+                    .catch(err => {
+                        if (err.code !== 'ENOENT') {
+                            console.error(`  ✗ Failed to remove ${fileName}:`, err.message);
+                        }
+                    })
+            );
+        }
+    } catch (err) {
+        console.error('  ✗ Playlist file cleanup error:', err.message);
+    }
+
+    // Wait for all cleanup tasks
+    await Promise.allSettled(cleanupTasks);
+    console.log('✅ Cleanup complete!\n');
+}
+
 const server = http.createServer((req, res) => {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -399,8 +515,20 @@ async function handleDownloadPlaylist(payload, res) {
     }
 }
 
-server.listen(PORT, () => {
-    console.log(`✓ CORS Proxy server running on http://localhost:${PORT}`);
-    console.log(`  Use this server to bypass CORS restrictions`);
-    console.log(`  Press Ctrl+C to stop`);
-});
+// Run cleanup before starting server
+cleanupOnStartup()
+    .then(() => {
+        server.listen(PORT, () => {
+            console.log(`✓ CORS Proxy server running on http://localhost:${PORT}`);
+            console.log(`  Use this server to bypass CORS restrictions`);
+            console.log(`  Press Ctrl+C to stop`);
+        });
+    })
+    .catch(err => {
+        console.error('❌ Cleanup failed, but starting server anyway:', err.message);
+        server.listen(PORT, () => {
+            console.log(`✓ CORS Proxy server running on http://localhost:${PORT}`);
+            console.log(`  Use this server to bypass CORS restrictions`);
+            console.log(`  Press Ctrl+C to stop`);
+        });
+    });
