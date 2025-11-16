@@ -10,13 +10,35 @@ import { URL, fileURLToPath } from 'url';
 import path from 'path';
 import { tmpdir } from 'os';
 import { spawn } from 'child_process';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, copyFile } from 'fs/promises';
 
 const PORT = 3000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '..');
+
+async function collectAudioFiles(rootDir, exts) {
+    const results = [];
+
+    async function walk(dir) {
+        const entries = await readdir(dir, {withFileTypes: true});
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                await walk(fullPath);
+            } else {
+                const lower = entry.name.toLowerCase();
+                if (exts.some(ext => lower.endsWith(ext))) {
+                    results.push(fullPath);
+                }
+            }
+        }
+    }
+
+    await walk(rootDir);
+    return results;
+}
 
 const server = http.createServer((req, res) => {
     // Enable CORS
@@ -147,7 +169,7 @@ async function handleDownloadPlaylist(payload, res) {
         await writeFile(playlistPath, playlistText, 'utf8');
 
         const songLines = playlistText.trim().split('\n').filter(line => line.trim());
-        const totalSongs = songLines.length;
+        let totalSongs = songLines.length;
 
         sendProgress({ stage: 'init', message: `Preparing to download ${totalSongs} songs...`, progress: 0 });
 
@@ -189,7 +211,26 @@ async function handleDownloadPlaylist(payload, res) {
             });
 
             finalPlaylistPath = spotifyUrlsPath;
-            sendProgress({ stage: 'convert', message: 'URLs converted successfully', progress: 10 });
+
+            // Recompute totalSongs based on actual Spotify URLs (excluding comments)
+            try {
+                const spotifyContent = await readFile(spotifyUrlsPath, 'utf8');
+                const urlLines = spotifyContent
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line && !line.startsWith('#'));
+                if (urlLines.length > 0) {
+                    totalSongs = urlLines.length;
+                }
+            } catch (e) {
+                console.error('Failed to read spotify-urls.txt:', e);
+            }
+
+            sendProgress({
+                stage: 'convert',
+                message: `URLs converted successfully for ${totalSongs} songs`,
+                progress: 10,
+            });
         }
 
         // Run Freyr CLI to download songs
@@ -213,16 +254,24 @@ async function handleDownloadPlaylist(payload, res) {
                 console.log('[freyr]', log);
                 sendProgress({ stage: 'download', log: log.trim() });
 
-                // Track completed songs (freyr outputs "✓" or "completed" for each song)
-                if (log.includes('✓') || log.toLowerCase().includes('completed')) {
-                    completedSongs++;
-                    const downloadProgress = 15 + Math.floor((completedSongs / totalSongs) * 70);
-                    sendProgress({ 
-                        stage: 'download', 
-                        message: `Downloaded ${completedSongs}/${totalSongs} songs`, 
-                        progress: downloadProgress 
-                    });
-                }
+                // Track completed songs based on per-track completion lines
+                // Example: "  • [✓] 01 Slow Dance"
+                log.split('\n').forEach(line => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return;
+                    if (trimmed.includes('• [✓]') && !trimmed.includes('Got ')) {
+                        if (totalSongs > 0 && completedSongs < totalSongs) {
+                            completedSongs++;
+                            const downloadProgress = 15 + Math.floor((completedSongs / totalSongs) * 65);
+                            const clamped = Math.min(downloadProgress, 80);
+                            sendProgress({
+                                stage: 'download',
+                                message: `Downloaded ${completedSongs}/${totalSongs} songs`,
+                                progress: clamped,
+                            });
+                        }
+                    }
+                });
             });
 
             child.stderr.on('data', d => {
@@ -238,13 +287,75 @@ async function handleDownloadPlaylist(payload, res) {
             });
         });
 
+        // Convert audio to MP3 and flatten into a single directory
+        sendProgress({
+            stage: 'convert-audio',
+            message: 'Converting tracks to MP3 and organizing files...',
+            progress: 85,
+        });
+
+        const flatDir = path.join(tempDir, 'songs');
+        await mkdir(flatDir, { recursive: true });
+
+        const audioFiles = await collectAudioFiles(downloadsDir, ['.m4a', '.mp3']);
+        let processed = 0;
+        const totalAudio = audioFiles.length;
+
+        for (const srcPath of audioFiles) {
+            const ext = path.extname(srcPath).toLowerCase();
+            const baseName = path.basename(srcPath, ext);
+            const destMp3Path = path.join(flatDir, `${baseName}.mp3`);
+
+            if (ext === '.m4a') {
+                await new Promise((resolve, reject) => {
+                    const ff = spawn('ffmpeg', [
+                        '-y',
+                        '-i', srcPath,
+                        '-codec:a', 'libmp3lame',
+                        '-b:a', '320k',
+                        destMp3Path,
+                    ]);
+
+                    ff.stdout.on('data', d => {
+                        const log = d.toString();
+                        console.log('[ffmpeg]', log);
+                        sendProgress({ stage: 'convert-audio', log: log.trim() });
+                    });
+                    ff.stderr.on('data', d => {
+                        const log = d.toString();
+                        console.error('[ffmpeg]', log);
+                        sendProgress({ stage: 'convert-audio', log: log.trim() });
+                    });
+
+                    ff.on('error', reject);
+                    ff.on('close', code => {
+                        if (code === 0) resolve();
+                        else reject(new Error(`ffmpeg exited with code ${code}`));
+                    });
+                });
+            } else {
+                await copyFile(srcPath, destMp3Path);
+            }
+
+            processed++;
+            if (totalAudio > 0) {
+                const convProgress = 85 + Math.floor((processed / totalAudio) * 5);
+                const clampedConv = Math.min(convProgress, 90);
+                sendProgress({
+                    stage: 'convert-audio',
+                    message: `Prepared ${processed}/${totalAudio} tracks`,
+                    progress: clampedConv,
+                });
+            }
+        }
+
         sendProgress({ stage: 'zip', message: 'Zipping downloads...', progress: 90 });
 
-        // Zip the downloads directory with no compression (-0)
+        // Zip the flattened songs directory with no compression (-0)
         const zipPath = path.join(tempDir, 'playlist.zip');
         await new Promise((resolve, reject) => {
-            const zip = spawn('zip', ['-r0', zipPath, path.basename(downloadsDir)], {
-                cwd: tempDir,
+            const zip = spawn('zip', ['-r0', zipPath, '.'], {
+                cwd: flatDir,
             });
 
             zip.stdout.on('data', d => {
