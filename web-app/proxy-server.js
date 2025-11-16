@@ -205,6 +205,10 @@ async function handleDownloadPlaylist(payload, res) {
                 cwd: REPO_ROOT,
             });
 
+            // Auto-answer format prompt with '2' for mp3
+            child.stdin.write('2\n');
+            child.stdin.end();
+
             child.stdout.on('data', d => {
                 const log = d.toString();
                 console.log('[freyr]', log);
