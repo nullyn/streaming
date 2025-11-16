@@ -72,21 +72,44 @@ A web application that extracts song information from playlist screenshots using
 - Much more accurate than traditional OCR
 - Choose the provider that best fits your needs and budget
 
-## Local Development
+## CORS Issue & Solution
 
-No build process required! Simply:
+**Problem**: Browsers block direct API calls from local HTML files due to CORS (Cross-Origin Resource Sharing) security.
+
+**Solution**: Use the included proxy server:
 
 ```bash
-# Navigate to the web-app directory
+# 1. Navigate to the web-app directory
 cd web-app
 
-# Open index.html in your browser
+# 2. Start the proxy server (Node.js required)
+node proxy-server.js
+
+# 3. Open index.html in your browser
 open index.html  # macOS
 # or
 start index.html # Windows
 # or
 xdg-open index.html # Linux
 ```
+
+The proxy server runs on `http://localhost:3000` and forwards requests to AI providers with proper CORS headers.
+
+### Alternative: Python HTTP Server
+
+```bash
+# Serve files with Python (no proxy, may still have CORS issues)
+python3 -m http.server 8000
+# Then open: http://localhost:8000
+```
+
+### Alternative: Browser Extension (Development Only)
+
+Install a CORS browser extension:
+- Chrome: "Allow CORS: Access-Control-Allow-Origin"
+- Firefox: "CORS Everywhere"
+
+**⚠️ Warning**: Disable CORS extensions when not developing!
 
 ## Browser Compatibility
 

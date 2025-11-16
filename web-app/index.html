@@ -26,9 +26,14 @@
                     </select>
                     
                     <label for="apiKey" class="key-label">API Key:</label>
-                    <input type="password" id="apiKey" placeholder="Enter your API key" class="api-input">
+                    <div class="key-input-group">
+                        <input type="password" id="apiKey" placeholder="Enter your API key" class="api-input">
+                        <button id="saveKeyBtn" class="save-key-btn">Save Key</button>
+                    </div>
+                    <p id="keySavedMsg" class="key-saved-msg" style="display:none;">✓ API key saved</p>
                     
-                    <p class="api-note">Your API key is stored locally and only sent to the selected provider.</p>
+                    <p class="api-note">Your API key is stored locally in your browser and only sent to the selected provider.</p>
+                    <p class="api-warning">⚠️ Note: Direct API calls from browser may be blocked by CORS. See README for server setup.</p>
                     
                     <div class="provider-links">
                         <a href="https://platform.openai.com/api-keys" target="_blank" class="api-link" data-provider="openai">Get OpenAI key</a>

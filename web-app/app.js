@@ -3,6 +3,8 @@ const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const apiProviderSelect = document.getElementById('apiProvider');
 const apiKeyInput = document.getElementById('apiKey');
+const saveKeyBtn = document.getElementById('saveKeyBtn');
+const keySavedMsg = document.getElementById('keySavedMsg');
 const previewSection = document.getElementById('previewSection');
 const preview = document.getElementById('preview');
 const processBtn = document.getElementById('processBtn');
@@ -32,10 +34,37 @@ apiProviderSelect.addEventListener('change', (e) => {
     updateProviderUI(provider);
 });
 
-// Save API key to localStorage when changed
-apiKeyInput.addEventListener('input', () => {
+// Save API key button handler
+saveKeyBtn.addEventListener('click', () => {
     const provider = apiProviderSelect.value;
-    localStorage.setItem(`${provider}_api_key`, apiKeyInput.value);
+    const key = apiKeyInput.value.trim();
+    
+    if (!key) {
+        alert('Please enter an API key first');
+        return;
+    }
+    
+    localStorage.setItem(`${provider}_api_key`, key);
+    
+    // Show saved message
+    keySavedMsg.style.display = 'block';
+    setTimeout(() => {
+        keySavedMsg.style.display = 'none';
+    }, 3000);
+});
+
+// Auto-save API key when typing (after a delay)
+let saveTimeout;
+apiKeyInput.addEventListener('input', () => {
+    clearTimeout(saveTimeout);
+    keySavedMsg.style.display = 'none';
+    
+    saveTimeout = setTimeout(() => {
+        const provider = apiProviderSelect.value;
+        if (apiKeyInput.value.trim()) {
+            localStorage.setItem(`${provider}_api_key`, apiKeyInput.value);
+        }
+    }, 1000);
 });
 
 function loadApiKeyForProvider(provider) {
@@ -150,6 +179,36 @@ const API_CONFIGS = {
     },
 };
 
+// Check if proxy server is available
+let proxyCheckCache = null;
+let proxyCheckTime = 0;
+
+async function checkProxyAvailable() {
+    // Cache result for 30 seconds
+    if (proxyCheckCache !== null && Date.now() - proxyCheckTime < 30000) {
+        return proxyCheckCache;
+    }
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1000);
+        
+        const response = await fetch('http://localhost:3000', {
+            method: 'OPTIONS',
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        proxyCheckCache = response.ok;
+        proxyCheckTime = Date.now();
+        return proxyCheckCache;
+    } catch (e) {
+        proxyCheckCache = false;
+        proxyCheckTime = Date.now();
+        return false;
+    }
+}
+
 // Initialize drag and drop
 function initDragAndDrop() {
     // Click to upload
@@ -242,7 +301,26 @@ async function processImage() {
     
     try {
         const requestConfig = config.buildRequest(apiKey, uploadedImageBase64);
-        const response = await fetch(config.endpoint, requestConfig);
+        
+        // Try to use local proxy server if available (bypasses CORS)
+        const useProxy = await checkProxyAvailable();
+        let response;
+        
+        if (useProxy) {
+            // Use proxy server
+            response = await fetch('http://localhost:3000', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    endpoint: config.endpoint,
+                    headers: requestConfig.headers,
+                    body: requestConfig.body
+                })
+            });
+        } else {
+            // Direct API call (may fail with CORS)
+            response = await fetch(config.endpoint, requestConfig);
+        }
         
         progressBar.style.width = '70%';
         progressText.textContent = 'Processing response...';
@@ -285,7 +363,19 @@ async function processImage() {
         
     } catch (error) {
         console.error('AI Processing Error:', error);
-        alert(`Failed to process image: ${error.message}`);
+        
+        let errorMessage = error.message;
+        
+        // Check if it's a CORS error
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            errorMessage = `CORS Error: Browser blocked the request to ${config.endpoint}.\n\n` +
+                         `This is a browser security restriction. To fix this:\n` +
+                         `1. Use a CORS proxy (see README)\n` +
+                         `2. Run a local server instead of opening HTML directly\n` +
+                         `3. Use a browser extension to bypass CORS (development only)`;
+        }
+        
+        alert(`Failed to process image:\n\n${errorMessage}`);
         reset();
     }
 }

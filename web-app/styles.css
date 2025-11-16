@@ -122,8 +122,14 @@ main {
     font-weight: 500;
 }
 
+.key-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
 .api-input {
-    width: 100%;
+    flex: 1;
     padding: 10px 15px;
     border: 2px solid #cbd5e0;
     border-radius: 6px;
@@ -137,11 +143,52 @@ main {
     border-color: #667eea;
 }
 
+.save-key-btn {
+    padding: 10px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.save-key-btn:hover {
+    background: #5568d3;
+    transform: translateY(-1px);
+}
+
+.key-saved-msg {
+    color: #48bb78;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-top: 8px;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
 .api-note {
     margin-top: 10px;
     font-size: 0.85rem;
     color: #718096;
     font-style: italic;
+}
+
+.api-warning {
+    margin-top: 8px;
+    padding: 10px;
+    background: #fef5e7;
+    border-left: 3px solid #f39c12;
+    font-size: 0.85rem;
+    color: #856404;
+    border-radius: 4px;
 }
 
 .api-link {
