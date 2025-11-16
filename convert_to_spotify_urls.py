@@ -7,6 +7,7 @@ Reads from my-playlist.txt and outputs spotify-urls.txt
 import requests
 import base64
 import sys
+import os
 import subprocess
 import shutil
 from pathlib import Path
@@ -120,8 +121,12 @@ def main():
     found_count = sum(1 for r in results if not r.startswith('#'))
     print(f"\n✅ Done! Converted {found_count}/{len(lines)} tracks")
     print(f"📄 Output saved to: {output_file}")
+
+    # In web-app mode, we only need the converted URLs and skip downloads/prompts
+    if os.getenv("FREYR_WEB_APP") == "1":
+        return
     
-    # Ask for format preference
+    # Ask for format preference when running interactively
     print("\n🎵 Choose output format:")
     print("  1) m4a (default, smaller file size)")
     print("  2) mp3 (more compatible)")

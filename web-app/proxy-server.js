@@ -164,6 +164,10 @@ async function handleDownloadPlaylist(payload, res) {
             await new Promise((resolve, reject) => {
                 const converter = spawn('python3', [converterScript], {
                     cwd: tempDir,
+                    env: {
+                        ...process.env,
+                        FREYR_WEB_APP: '1',
+                    },
                 });
 
                 converter.stdout.on('data', d => {
@@ -198,16 +202,11 @@ async function handleDownloadPlaylist(payload, res) {
                 cliPath,
                 '--no-logo',
                 '--no-header',
-                '--format', 'mp3',
                 '--directory', downloadsDir,
                 '-i', finalPlaylistPath,
             ], {
                 cwd: REPO_ROOT,
             });
-
-            // Auto-answer format prompt with '2' for mp3
-            child.stdin.write('2\n');
-            child.stdin.end();
 
             child.stdout.on('data', d => {
                 const log = d.toString();
